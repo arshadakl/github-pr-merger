@@ -65,6 +65,9 @@ merge-pr
 
 For situations where CLI isn't available, use the web interface:
 
+**🌐 Live Demo:** [https://arshadakl.github.io/github-pr-merger/](https://arshadakl.github.io/github-pr-merger/web)
+
+**Local Usage:**
 1. Open `web/index.html` in any modern browser
 2. Enter your GitHub Personal Access Token
 3. Select repository and merge PRs
@@ -119,10 +122,6 @@ See [Web Interface Documentation](web/README.md) for detailed instructions.
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 

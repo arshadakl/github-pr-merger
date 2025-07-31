@@ -10,24 +10,34 @@ The web interface provides the same functionality as the CLI tool but runs entir
 - Quick access from any web browser
 - Shared computers or restricted environments
 
+**🚀 Try it live:** [https://arshadakl.github.io/github-pr-merger/](https://arshadakl.github.io/github-pr-merger/)
+
 ## 🚀 Getting Started
 
 ### Simple Setup
 
-1. **Open the file**: Simply open `index.html` in any modern web browser
+**🌐 Online (Recommended):**
+1. **Visit**: [https://arshadakl.github.io/github-pr-merger/](https://arshadakl.github.io/github-pr-merger/)
 2. **Enter token**: Input your GitHub Personal Access Token
 3. **Authenticate**: Click "Authenticate" to verify your credentials
 4. **Select repository**: Choose from your accessible private repositories
 5. **Review PR**: View the latest pull request details
 6. **Merge**: Click "Merge PR" to complete the merge
 
+**📁 Local Usage:**
+1. **Download**: Clone the repository or download `web/index.html`
+2. **Open**: Open `index.html` in any modern web browser
+3. **Follow**: Same steps as online version above
+
 ### No Installation Required
 
 Unlike the CLI version, the web interface requires zero installation:
-- No Node.js needed
-- No package installation
-- No environment setup
-- Works offline once loaded
+- ✅ **Hosted on GitHub Pages** - Access from anywhere with internet
+- ✅ **No Node.js needed** - Pure browser-based solution
+- ✅ **No package installation** - Just visit the URL
+- ✅ **No environment setup** - Works immediately
+- ✅ **Mobile friendly** - Perfect for phones and tablets
+- ✅ **Bookmark-able** - Save as home screen app
 
 ## 🔧 Features
 
