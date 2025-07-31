@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub PR Merger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0052a3;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: #d73a49;
+            background-color: #ffeef0;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .success {
+            color: #28a745;
+            background-color: #f0fff4;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .warning {
+            color: #856404;
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .pr-details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+
+        .pr-details h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+
+        .pr-detail-item {
+            margin: 8px 0;
+        }
+
+        .pr-detail-label {
+            font-weight: bold;
+            color: #586069;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .repo-item {
+            padding: 8px;
+            margin: 4px 0;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .merge-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .merge-actions button {
+            flex: 1;
+        }
+
+        .cancel-btn {
+            background-color: #6c757d;
+        }
+
+        .cancel-btn:hover {
+            background-color: #545b62;
+        }
+
+        .merge-btn {
+            background-color: #28a745;
+        }
+
+        .merge-btn:hover {
+            background-color: #218838;
+        }
+
+        .back-btn {
+            background-color: #6c757d;
+            margin-bottom: 20px;
+        }
+
+        .back-btn:hover {
+            background-color: #545b62;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>GitHub PR Merger</h1>
+
+        <!-- Token Input Section -->
+        <div id="tokenSection" class="section">
+            <h2>GitHub Authentication</h2>
+            <p>Enter your GitHub Personal Access Token with 'repo' scope permissions:</p>
+            <input type="password" id="githubToken" placeholder="GitHub Personal Access Token" />
+            <button id="authenticateBtn" onclick="authenticate()">Authenticate</button>
+            <div id="authStatus"></div>
+        </div>
+
+        <!-- Repository Selection Section -->
+        <div id="repoSection" class="section hidden">
+            <button class="back-btn" onclick="goBack()">← Back to Authentication</button>
+            <h2>Select Repository</h2>
+            <div id="repoStatus"></div>
+            <select id="repoSelect" size="10" onchange="selectRepository()">
+                <option value="">Select a repository...</option>
+            </select>
+            <div id="repoInfo"></div>
+        </div>
+
+        <!-- PR Details Section -->
+        <div id="prSection" class="section hidden">
+            <button class="back-btn" onclick="goBackToRepos()">← Back to Repositories</button>
+            <h2>Pull Request Details</h2>
+            <div id="prStatus"></div>
+            <div id="prDetails"></div>
+            <div id="mergeActions" class="merge-actions hidden">
+                <button class="cancel-btn" onclick="goBackToRepos()">Cancel</button>
+                <button class="merge-btn" onclick="mergePR()">Merge PR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let octokit = null;
+        let currentUser = null;
+        let repositories = [];
+        let selectedRepo = null;
+        let currentPR = null;
+
+        // Load Octokit dynamically
+        async function loadOctokit() {
+            if (typeof window.Octokit !== 'undefined') {
+                return window.Octokit;
+            }
+
+            try {
+                // Try dynamic import first
+                const module = await import('https://cdn.skypack.dev/@octokit/rest');
+                return module.Octokit;
+            } catch (e) {
+                // Fallback: create script tag and wait for it to load
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/@octokit/rest@19/dist/index.umd.min.js';
+                    script.onload = () => {
+                        if (window.Octokit) {
+                            resolve(window.Octokit);
+                        } else {
+                            reject(new Error('Octokit failed to load'));
+                        }
+                    };
+                    script.onerror = () => reject(new Error('Failed to load Octokit script'));
+                    document.head.appendChild(script);
+                });
+            }
+        }
+
+        // Show/hide sections
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        // Show messages
+        function showMessage(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function clearMessage(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        // Authentication
+        async function authenticate() {
+            const token = document.getElementById('githubToken').value.trim();
+
+            if (!token) {
+                showMessage('authStatus', 'Please enter a GitHub token', 'error');
+                return;
+            }
+
+            showMessage('authStatus', 'Loading GitHub API...', 'info');
+            document.getElementById('authenticateBtn').disabled = true;
+
+            try {
+                // Load Octokit library
+                const OctokitClass = await loadOctokit();
+
+                showMessage('authStatus', 'Authenticating...', 'info');
+
+                // Create Octokit instance
+                octokit = new OctokitClass({ auth: token });
+                currentUser = await getUserInfo();
+
+                if (currentUser) {
+                    showMessage('authStatus', `✓ Authenticated as ${currentUser}`, 'success');
+                    await loadRepositories();
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                showMessage('authStatus', `Authentication failed: ${error.message}`, 'error');
+                octokit = null;
+                currentUser = null;
+            } finally {
+                document.getElementById('authenticateBtn').disabled = false;
+            }
+        }
+
+        async function getUserInfo() {
+            try {
+                const { data } = await octokit.users.getAuthenticated();
+                return data.login;
+            } catch (error) {
+                throw new Error('Authentication Error: ' + error.message);
+            }
+        }
+
+        // Repository functions
+        async function hasRepositoryAccess(repo) {
+            // First check if permissions are directly available
+            if (repo.permissions && (repo.permissions.push || repo.permissions.admin)) {
+                return true;
+            }
+
+            // Fallback: Try to verify access by attempting API calls
+            try {
+                await octokit.repos.get({
+                    owner: repo.owner.login,
+                    repo: repo.name
+                });
+
+                // Try to list collaborators - this requires push access
+                await octokit.repos.listCollaborators({
+                    owner: repo.owner.login,
+                    repo: repo.name,
+                    per_page: 1
+                });
+
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        async function filterAccessibleRepositories(repositories) {
+            const accessibleRepos = [];
+
+            for (const repo of repositories) {
+                const hasAccess = await hasRepositoryAccess(repo);
+
+                if (hasAccess) {
+                    accessibleRepos.push({
+                        name: `${repo.full_name} (${repo.private ? 'Private' : 'Public'})`,
+                        value: {
+                            owner: repo.owner.login,
+                            repo: repo.name,
+                            full_name: repo.full_name
+                        }
+                    });
+                }
+            }
+
+            return accessibleRepos;
+        }
+
+        async function loadRepositories() {
+            try {
+                showMessage('repoStatus', 'Fetching repositories...', 'info');
+
+                const { data } = await octokit.repos.listForAuthenticatedUser({
+                    sort: 'updated',
+                    per_page: 100,
+                    visibility: 'private'
+                });
+
+                if (data.length === 0) {
+                    showMessage('repoStatus', 'No private repositories found.', 'warning');
+                    return;
+                }
+
+                showMessage('repoStatus', `Found ${data.length} private repositories. Filtering repositories with sufficient permissions...`, 'info');
+
+                const accessibleRepos = await filterAccessibleRepositories(data);
+
+                if (accessibleRepos.length === 0) {
+                    showMessage('repoStatus', 'No private repositories found with sufficient permissions (push/admin access required).', 'warning');
+                    return;
+                }
+
+                repositories = accessibleRepos;
+                populateRepositorySelect();
+                showMessage('repoStatus', `Found ${accessibleRepos.length} accessible private repositories out of ${data.length} total private repositories.`, 'success');
+                showSection('repoSection');
+
+            } catch (error) {
+                showMessage('repoStatus', `Error fetching repositories: ${error.message}`, 'error');
+            }
+        }
+
+        function populateRepositorySelect() {
+            const select = document.getElementById('repoSelect');
+            select.innerHTML = '<option value="">Select a repository...</option>';
+
+            repositories.forEach((repo, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = repo.name;
+                select.appendChild(option);
+            });
+        }
+
+        async function selectRepository() {
+            const select = document.getElementById('repoSelect');
+            const selectedIndex = select.value;
+
+            if (selectedIndex === '') {
+                clearMessage('repoInfo');
+                return;
+            }
+
+            selectedRepo = repositories[selectedIndex].value;
+            showMessage('repoInfo', `Selected: ${selectedRepo.full_name}`, 'info');
+
+            // Load PR for selected repository
+            await loadLatestPR();
+        }
+
+        // PR functions
+        async function loadLatestPR() {
+            try {
+                showSection('prSection');
+                showMessage('prStatus', `Fetching latest PR for ${selectedRepo.full_name}...`, 'info');
+
+                const { data } = await octokit.pulls.list({
+                    owner: selectedRepo.owner,
+                    repo: selectedRepo.repo,
+                    state: 'open',
+                    sort: 'updated',
+                    direction: 'desc',
+                    per_page: 1
+                });
+
+                if (data.length === 0) {
+                    showMessage('prStatus', 'No open pull requests found for this repository.', 'warning');
+                    document.getElementById('prDetails').innerHTML = '';
+                    document.getElementById('mergeActions').classList.add('hidden');
+                    return;
+                }
+
+                currentPR = data[0];
+                await checkMergePermissions();
+                displayPRDetails();
+
+            } catch (error) {
+                showMessage('prStatus', `Error fetching pull requests: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkMergePermissions() {
+            try {
+                const { data: repoData } = await octokit.repos.get({
+                    owner: selectedRepo.owner,
+                    repo: selectedRepo.repo
+                });
+
+                if (!repoData.permissions || (!repoData.permissions.push && !repoData.permissions.admin)) {
+                    showMessage('prStatus', 'Warning: Limited repository permissions detected. You may not be able to merge pull requests in this repository.', 'warning');
+                    return false;
+                }
+
+                return true;
+            } catch (error) {
+                showMessage('prStatus', `Warning: Unable to verify merge permissions. Reason: ${error.message}`, 'warning');
+                return false;
+            }
+        }
+
+        function displayPRDetails() {
+            const prDetailsDiv = document.getElementById('prDetails');
+            const pr = currentPR;
+
+            prDetailsDiv.innerHTML = `
+                <div class="pr-details">
+                    <h3>Latest Pull Request</h3>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Title:</span> ${pr.title}
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Number:</span> #${pr.number}
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Created by:</span> ${pr.user.login}
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Base branch:</span> ${pr.base.ref}
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Head branch:</span> ${pr.head.ref}
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">URL:</span> <a href="${pr.html_url}" target="_blank">${pr.html_url}</a>
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Created at:</span> ${new Date(pr.created_at).toLocaleString()}
+                    </div>
+                    <div class="pr-detail-item">
+                        <span class="pr-detail-label">Updated at:</span> ${new Date(pr.updated_at).toLocaleString()}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('mergeActions').classList.remove('hidden');
+            clearMessage('prStatus');
+        }
+
+        async function mergePR() {
+            if (!currentPR) {
+                showMessage('prStatus', 'No PR selected for merging', 'error');
+                return;
+            }
+
+            const confirmMerge = confirm(`Do you want to merge PR #${currentPR.number} into ${currentPR.base.ref}?`);
+
+            if (!confirmMerge) {
+                showMessage('prStatus', 'Merge cancelled.', 'warning');
+                return;
+            }
+
+            try {
+                showMessage('prStatus', `Merging PR #${currentPR.number}: ${currentPR.title}...`, 'info');
+
+                // Check merge permissions before attempting to merge
+                const hasMergePermissions = await checkMergePermissions();
+
+                if (!hasMergePermissions) {
+                    showMessage('prStatus', 'Insufficient permissions to merge this pull request', 'error');
+                    return;
+                }
+
+                const { data } = await octokit.pulls.merge({
+                    owner: selectedRepo.owner,
+                    repo: selectedRepo.repo,
+                    pull_number: currentPR.number,
+                    merge_method: 'merge'
+                });
+
+                showMessage('prStatus', `✓ Pull request successfully merged! SHA: ${data.sha}`, 'success');
+                document.getElementById('mergeActions').classList.add('hidden');
+
+            } catch (error) {
+                let errorMessage = `Error merging pull request: ${error.message}`;
+
+                // Provide more specific error guidance
+                if (error.message.includes('Resource not accessible by personal access token')) {
+                    errorMessage += `
+                        <br><br><strong>Possible solutions:</strong>
+                        <br>1. Check that your GitHub token has "repo" scope permissions
+                        <br>2. Verify you have write/admin access to this repository
+                        <br>3. Check if branch protection rules are blocking the merge
+                        <br>4. Ensure the PR meets all repository requirements (reviews, status checks, etc.)
+                    `;
+                } else if (error.message.includes('Pull request is not mergeable')) {
+                    errorMessage += `
+                        <br><br><strong>The pull request cannot be merged:</strong>
+                        <br>- There might be merge conflicts
+                        <br>- Required status checks may be failing
+                        <br>- Required reviews may be missing
+                    `;
+                }
+
+                showMessage('prStatus', errorMessage, 'error');
+            }
+        }
+
+        // Navigation functions
+        function goBack() {
+            showSection('tokenSection');
+            // Reset state
+            octokit = null;
+            currentUser = null;
+            repositories = [];
+            selectedRepo = null;
+            currentPR = null;
+            document.getElementById('githubToken').value = '';
+            clearMessage('authStatus');
+        }
+
+        function goBackToRepos() {
+            showSection('repoSection');
+            selectedRepo = null;
+            currentPR = null;
+            document.getElementById('repoSelect').value = '';
+            clearMessage('repoInfo');
+        }
+
+        // Initialize
+        document.getElementById('githubToken').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                authenticate();
+            }
+        });
+    </script>
+</body>
+
+</html>

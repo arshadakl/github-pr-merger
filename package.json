@@ -1,0 +1,23 @@
+{
+  "name": "github-pr-merger",
+  "version": "1.0.0",
+  "description": "A tool to merge the latest GitHub PR in a repository",
+  "type": "module",
+  "main": "app.js",
+  "bin": {
+    "merge-pr": "./app.js"
+  },
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^19.0.7",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.0.3",
+    "inquirer": "^8.2.5",
+    "octokit": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
